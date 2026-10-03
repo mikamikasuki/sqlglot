@@ -1,0 +1,44 @@
+name: SQL Server table-hint probes
+on:
+  push:
+    branches: [validation/sqlserver-8468-baseline]
+permissions:
+  contents: read
+jobs:
+  probes:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v7
+      - name: Start disposable SQL Server
+        shell: bash
+        run: |
+          set -eu
+          password="Aa1!$(openssl rand -hex 20)"
+          echo "::add-mask::$password"
+          echo "SQLSERVER_PASSWORD=$password" >> "$GITHUB_ENV"
+          docker pull mcr.microsoft.com/mssql/server:2022-latest
+          docker image inspect mcr.microsoft.com/mssql/server:2022-latest --format '{{json .RepoDigests}}'
+          docker run --detach --name sqlserver-probes --memory=4g \
+            -e ACCEPT_EULA=Y -e MSSQL_PID=Developer -e MSSQL_SA_PASSWORD="$password" \
+            mcr.microsoft.com/mssql/server:2022-latest
+          for attempt in $(seq 1 60); do
+            if docker exec sqlserver-probes /opt/mssql-tools18/bin/sqlcmd \
+              -S localhost -U sa -P "$password" -C -b -Q 'SELECT @@VERSION;' > /tmp/sqlserver-version.log 2>&1; then
+              cat /tmp/sqlserver-version.log
+              exit 0
+            fi
+            sleep 2
+          done
+          cat /tmp/sqlserver-version.log
+          exit 1
+      - name: Execute exact scratch database probes
+        run: python3 .github/sqlserver_probes.py
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: sqlserver-probe-results
+          path: sqlserver-probe-results.json
+      - name: Remove disposable SQL Server
+        if: always()
+        run: docker rm --force sqlserver-probes || true
