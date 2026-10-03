@@ -48,7 +48,8 @@ fixtures = [
     ("alias_hint", "SELECT * FROM dbo.t AS a (NOLOCK)", "SELECT * FROM dbo.t AS a WITH (NOLOCK)"),
     ("unquoted_hint_argument", "SELECT * FROM dbo.src CROSS APPLY dbo.fn(NOLOCK)", "SELECT * FROM dbo.src CROSS APPLY dbo.fn(NOLOCK)"),
 ]
-results = {"source_sha": subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip(),
+results = {"validation_workflow_sha": subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip(),
+           "parser_source_sha": "bffcdefc16b01527ee252ad2bf322b0bbff33bc8", "candidate_source_sha": None,
            "server_version": query("SELECT @@VERSION;"), "fixtures": []}
 for name, original, canonical in fixtures:
     baseline_generated = sqlglot.parse_one(original, read="tsql").sql("tsql")
@@ -64,4 +65,22 @@ record = {"name": "temporary_table", "original": query(temporary_setup + origina
           "baseline_generated": query(temporary_setup + sqlglot.parse_one(original, read="tsql").sql("tsql"))}
 print(json.dumps(record), flush=True)
 results["fixtures"].append(record)
+candidate = json.loads(Path(".github/candidate_sql_queries.json").read_text())
+results["candidate_patch_sha256"] = candidate["candidate_patch_sha256"]
+results["candidate_generated_sql"] = []
+failures = []
+for fixture in candidate["fixtures"]:
+    prefix = temporary_setup if "#t" in fixture["original"] else ""
+    record = {"original": query(prefix + fixture["original"]),
+              "generated": query(prefix + fixture["generated"])}
+    record["both_execute_same_output"] = (
+        record["original"]["exit_code"] == record["generated"]["exit_code"] == 0
+        and record["original"]["stdout"] == record["generated"]["stdout"]
+    )
+    if not record["both_execute_same_output"]:
+        failures.append(fixture["original"])
+    print(json.dumps(record), flush=True)
+    results["candidate_generated_sql"].append(record)
 Path("sqlserver-probe-results.json").write_text(json.dumps(results, indent=2) + "\n")
+if failures:
+    raise AssertionError("SQL Server execution/comparison failed: " + repr(failures))
