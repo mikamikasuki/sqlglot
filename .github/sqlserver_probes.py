@@ -14,7 +14,7 @@ password = os.environ["SQLSERVER_PASSWORD"]
 def query(sql, database="HintValidation"):
     completed = subprocess.run(
         ["docker", "exec", "-i", "sqlserver-probes", "/opt/mssql-tools18/bin/sqlcmd",
-         "-S", "localhost", "-U", "sa", "-P", password, "-C", "-b", "-W", "-d", database],
+         "-S", "localhost", "-U", "sa", "-P", password, "-C", "-I", "-b", "-W", "-d", database],
         input=("" if sql.startswith("CREATE FUNCTION") else "SET NOCOUNT ON;\n") + sql + "\nGO\n", text=True,
         capture_output=True, timeout=30,
     )
