@@ -36,6 +36,14 @@ for statement in setup:
     if result["exit_code"]:
         raise RuntimeError(result)
 
+created = query("CREATE DATABASE source_table;", "master")
+if created["exit_code"]:
+    raise RuntimeError(created)
+xml_setup = "CREATE TABLE dbo.source_data (RECORDID INT NOT NULL, FormContent XML NOT NULL); INSERT INTO dbo.source_data VALUES (1, '<FORM_ROOT><SOME_TAG>3.5</SOME_TAG></FORM_ROOT>');"
+created = query(xml_setup, "source_table")
+if created["exit_code"]:
+    raise RuntimeError(created)
+
 fixtures = [
     ("unqualified", "SELECT * FROM t (NOLOCK)", "SELECT * FROM t WITH (NOLOCK)"),
     ("qualified", "SELECT * FROM dbo.t (NOLOCK)", "SELECT * FROM dbo.t WITH (NOLOCK)"),

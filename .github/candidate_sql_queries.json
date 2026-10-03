@@ -59,6 +59,10 @@
     {
       "original": "SELECT * FROM dbo.fn(1) AS s",
       "generated": "SELECT * FROM dbo.FN(1) AS s"
+    },
+    {
+      "original": "SELECT TOP 10 s.RECORDID, n.c.VALUE('(/*:FORM_ROOT/*:SOME_TAG)[1]', 'float') AS SOME_TAG_VALUE FROM source_table.dbo.source_data AS s(nolock) CROSS APPLY FormContent.nodes('/*:FORM_ROOT') AS N(C)",
+      "generated": "SELECT TOP 10 s.RECORDID, n.c.VALUE('(/*:FORM_ROOT/*:SOME_TAG)[1]', 'float') AS SOME_TAG_VALUE FROM source_table.dbo.source_data AS s WITH (NOLOCK) CROSS APPLY FormContent.nodes('/*:FORM_ROOT') AS N(C)"
     }
   ],
   "generation_parser_module_file": "/var/folders/6c/h870p8gn45z74jqmgdl9jp680000gn/T/sqlglot-8468-final-source-lp17144w/sqlglot/parsers/tsql.py",
