@@ -478,6 +478,23 @@ class TestOptimizer(unittest.TestCase):
         )
         self.assertEqual(physical.find(exp.Column), exp.column("state", table="address"))
 
+    def test_qualify_aliased_parenthesized_join_keeps_all_tables(self):
+        schema = {
+            "a": {"a_id": "INT"},
+            "b": {"b_id": "INT"},
+            "c": {"c_id": "INT"},
+        }
+        query = "SELECT * FROM ((a JOIN b ON TRUE) CROSS JOIN c) AS j"
+
+        qualified = qualify(parse_one(query), schema=schema, identify=False)
+
+        self.assertEqual(
+            qualified.sql(),
+            "SELECT j.a_id AS a_id, j.b_id AS b_id, j.c_id AS c_id "
+            "FROM (SELECT a.a_id AS a_id, b.b_id AS b_id, c.c_id AS c_id "
+            "FROM a AS a JOIN b AS b ON TRUE CROSS JOIN c) AS j",
+        )
+
     def test_qualify_correlated_shadowed_struct_path(self):
         schema = {
             "customer": {"address": "STRUCT<state TEXT>"},

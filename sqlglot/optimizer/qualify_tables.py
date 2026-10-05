@@ -139,7 +139,13 @@ def qualify_tables(
         for derived_table in scope.derived_tables:
             unnested = derived_table.unnest()
             if isinstance(unnested, exp.Table):
-                joins = unnested.args.get("joins")
+                joins = []
+                current = derived_table.this
+                while isinstance(current, exp.Subquery):
+                    joins = (current.args.get("joins") or []) + joins
+                    current = current.this
+
+                joins = (unnested.args.get("joins") or []) + joins
                 unnested.set("joins", None)
                 derived_table.this.replace(exp.select("*").from_(unnested.copy(), copy=False))
                 derived_table.this.set("joins", joins)
