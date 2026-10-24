@@ -13,6 +13,23 @@ class TestSnowflake(Validator):
     maxDiff = None
     dialect = "snowflake"
 
+    def test_lambda_argument_types_are_not_shared(self):
+        expression = parse_one("TRANSFORM(x, a INT -> a + a)", read="snowflake")
+        types = list(expression.find_all(exp.DataType))
+
+        self.assertEqual(len(types), 2)
+        self.assertIsNot(types[0], types[1])
+
+        expression.transform(
+            lambda node: exp.DataType.build("BIGINT") if isinstance(node, exp.DataType) else node,
+            copy=False,
+        )
+
+        self.assertEqual(
+            expression.sql("snowflake"),
+            "TRANSFORM(x, a -> CAST(a AS BIGINT) + CAST(a AS BIGINT))",
+        )
+
     def test_set_operation_top(self):
         for op in ("UNION", "UNION ALL", "INTERSECT", "EXCEPT"):
             with self.subTest(op=op):
