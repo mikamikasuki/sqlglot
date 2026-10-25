@@ -4292,6 +4292,12 @@ class TestSnowflake(Validator):
         self.validate_identity("SELECT CAST(a AS VARIANT)")
         self.validate_identity("SELECT CAST(a AS ARRAY)")
 
+        self.validate_transpile(
+            "SELECT PARSE_JSON('[1, 2]')::ARRAY, PARSE_JSON('{\"a\": 1}')::OBJECT",
+            "SELECT CAST(JSON('[1, 2]') AS JSON[]), CAST(JSON('{\"a\": 1}') AS JSON)",
+            "duckdb",
+        )
+
         self.validate_all(
             "SELECT a::VARIANT",
             write={

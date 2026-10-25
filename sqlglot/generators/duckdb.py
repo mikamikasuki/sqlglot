@@ -2336,7 +2336,13 @@ class DuckDBGenerator(generator.Generator):
 
     def datatype_sql(self, expression: exp.DataType) -> str:
         if expression.is_type(exp.DType.ARRAY):
+            if not expression.expressions:
+                return "JSON[]"
+
             return f"{self.expressions(expression, flat=True)}[{self.expressions(expression, key='values', flat=True)}]"
+
+        if expression.is_type(exp.DType.OBJECT) and not expression.expressions:
+            return "JSON"
 
         # Modifiers are not supported for TIME, [TIME | TIMESTAMP] WITH TIME ZONE
         if expression.is_type(
