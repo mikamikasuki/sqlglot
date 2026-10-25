@@ -377,6 +377,8 @@ class Parser:
             Set to -1 (default) to disable the check.
     """
 
+    INDEX_TABLESPACE_KEYWORD: t.ClassVar[str | None] = None
+
     __slots__ = (
         "error_level",
         "error_message_context",
@@ -4920,7 +4922,13 @@ class Parser:
         return this
 
     def _parse_index_params(self) -> exp.IndexParameters:
-        using = self._parse_var(any_token=True) if self._match(TokenType.USING) else None
+        using = (
+            self._parse_var(any_token=True)
+            if self._match(TokenType.USING, advance=False)
+            and not self._match_text_seq("USING", "INDEX", "TABLESPACE", advance=False)
+            and self._match(TokenType.USING)
+            else None
+        )
 
         if self._match(TokenType.L_PAREN, advance=False):
             columns = self._parse_wrapped_csv(self._parse_with_operator)
@@ -4930,11 +4938,12 @@ class Parser:
         include = self._parse_wrapped_id_vars() if self._match_text_seq("INCLUDE") else None
         partition_by = self._parse_partition_by()
         with_storage = self._match(TokenType.WITH) and self._parse_wrapped_properties()
-        tablespace = (
-            self._parse_var(any_token=True)
-            if self._match_text_seq("USING", "INDEX", "TABLESPACE")
-            else None
-        )
+        if self._match_text_seq("USING", "INDEX", "TABLESPACE"):
+            tablespace = self._parse_var(any_token=True)
+        elif self.INDEX_TABLESPACE_KEYWORD and self._match_text_seq(self.INDEX_TABLESPACE_KEYWORD):
+            tablespace = self._parse_var(any_token=True)
+        else:
+            tablespace = None
         where = self._parse_where()
 
         on = self._parse_field() if self._match(TokenType.ON) else None
@@ -8082,13 +8091,20 @@ class Parser:
 
     def _parse_unique(self) -> exp.UniqueColumnConstraint:
         self._match_texts(("KEY", "INDEX"))
+        index_type = None
+        if self._match(TokenType.USING, advance=False) and not self._match_text_seq(
+            "USING", "INDEX", "TABLESPACE", advance=False
+        ):
+            self._advance()
+            index_type = self._advance_any() and self._prev.text
         return self.expression(
             exp.UniqueColumnConstraint(
                 nulls=self._match_text_seq("NULLS", "NOT", "DISTINCT"),
                 this=self._parse_schema(self._parse_unique_key()),
-                index_type=self._match(TokenType.USING) and self._advance_any() and self._prev.text,
+                index_type=index_type,
                 on_conflict=self._parse_on_conflict(),
                 options=self._parse_key_constraint_options(),
+                include=self._parse_index_params(),
             )
         )
 
@@ -8209,7 +8225,9 @@ class Parser:
         if not in_props and not self._match(TokenType.L_PAREN, advance=False):
             return self.expression(
                 exp.PrimaryKeyColumnConstraint(
-                    desc=desc, options=self._parse_key_constraint_options()
+                    desc=desc,
+                    options=self._parse_key_constraint_options(),
+                    include=self._parse_index_params(),
                 )
             )
 

@@ -1325,10 +1325,12 @@ class Generator:
     def primarykeycolumnconstraint_sql(self, expression: exp.PrimaryKeyColumnConstraint) -> str:
         desc = expression.args.get("desc")
         if desc is not None:
-            return f"PRIMARY KEY{' DESC' if desc else ' ASC'}"
+            key = f"PRIMARY KEY{' DESC' if desc else ' ASC'}"
+            return f"{key}{self.sql(expression, 'include')}"
         options = self.expressions(expression, key="options", flat=True, sep=" ")
         options = f" {options}" if options else ""
-        return f"PRIMARY KEY{options}"
+        include = self.sql(expression, "include")
+        return f"PRIMARY KEY{options}{include}"
 
     def uniquecolumnconstraint_sql(self, expression: exp.UniqueColumnConstraint) -> str:
         this = self.sql(expression, "this")
@@ -1340,7 +1342,8 @@ class Generator:
         nulls_sql = " NULLS NOT DISTINCT" if expression.args.get("nulls") else ""
         options = self.expressions(expression, key="options", flat=True, sep=" ")
         options = f" {options}" if options else ""
-        return f"UNIQUE{nulls_sql}{this}{index_type}{on_conflict}{options}"
+        include = self.sql(expression, "include")
+        return f"UNIQUE{nulls_sql}{this}{index_type}{on_conflict}{options}{include}"
 
     def inoutcolumnconstraint_sql(self, expression: exp.InOutColumnConstraint) -> str:
         input_ = expression.args.get("input_")

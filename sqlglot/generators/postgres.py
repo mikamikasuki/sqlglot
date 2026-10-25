@@ -427,6 +427,7 @@ class PostgresGenerator(generator.Generator):
     PROPERTIES_LOCATION = {
         **generator.Generator.PROPERTIES_LOCATION,
         exp.PartitionedByProperty: exp.Properties.Location.POST_SCHEMA,
+        exp.TableSpaceProperty: exp.Properties.Location.POST_SCHEMA,
         exp.TransientProperty: exp.Properties.Location.UNSUPPORTED,
         exp.VolatileProperty: exp.Properties.Location.UNSUPPORTED,
     }
@@ -444,6 +445,15 @@ class PostgresGenerator(generator.Generator):
     def schemacommentproperty_sql(self, expression: exp.SchemaCommentProperty) -> str:
         self.unsupported("Table comments are not supported in the CREATE statement")
         return ""
+
+    def tablespaceproperty_sql(self, expression: exp.TableSpaceProperty) -> str:
+        return f"TABLESPACE {self.sql(expression, 'this')}"
+
+    def indexparameters_sql(self, expression: exp.IndexParameters) -> str:
+        sql = super().indexparameters_sql(expression)
+        if isinstance(expression.parent, exp.Index) and expression.args.get("tablespace"):
+            sql = sql.replace(" USING INDEX TABLESPACE ", " TABLESPACE ")
+        return sql
 
     def commentcolumnconstraint_sql(self, expression: exp.CommentColumnConstraint) -> str:
         self.unsupported("Column comments are not supported in the CREATE statement")

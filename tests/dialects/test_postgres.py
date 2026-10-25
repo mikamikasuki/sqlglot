@@ -9,6 +9,33 @@ class TestPostgres(Validator):
     maxDiff = None
     dialect = "postgres"
 
+    def test_tablespace_in_create_statements(self):
+        statements = (
+            ("CREATE TABLE m (a INT PRIMARY KEY) TABLESPACE ts", None),
+            (
+                "CREATE TABLE m (a INT) WITH (fillfactor=70) TABLESPACE ts",
+                "CREATE TABLE m (a INT) TABLESPACE ts WITH (fillfactor=70)",
+            ),
+            ("CREATE INDEX i ON t (a) TABLESPACE ts", "CREATE INDEX i ON t(a) TABLESPACE ts"),
+            ("CREATE MATERIALIZED VIEW mv TABLESPACE ts AS SELECT 1", None),
+            (
+                "CREATE TABLE m (a INT, CONSTRAINT pk PRIMARY KEY (a) USING INDEX TABLESPACE ts)",
+                None,
+            ),
+            ("CREATE TABLE m (a INT, UNIQUE (a) USING INDEX TABLESPACE ts)", None),
+            ("CREATE TABLE m (a INT PRIMARY KEY USING INDEX TABLESPACE ts)", None),
+        )
+        for sql, expected in statements:
+            with self.subTest(sql=sql):
+                create = self.validate_identity(sql, expected).assert_is(exp.Create)
+                if "CREATE INDEX" in sql:
+                    self.assertEqual(create.this.args["params"].args["tablespace"].name, "ts")
+                elif "USING INDEX TABLESPACE" in sql:
+                    params = create.find(exp.IndexParameters)
+                    self.assertEqual(params.args["tablespace"].name, "ts")
+                else:
+                    self.assertIsNotNone(create.find(exp.TableSpaceProperty))
+
     def test_is_precedence(self):
         for predicate in (
             "NULL IN (0)",

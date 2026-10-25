@@ -84,6 +84,7 @@ def _build_levenshtein_less_equal(args: list) -> exp.Levenshtein:
 
 
 class PostgresParser(parser.Parser):
+    INDEX_TABLESPACE_KEYWORD = "TABLESPACE"
     IS_PREDICATE_PRECEDENCE = IsPredicatePrecedence.LOW
 
     ALTER_DROP_REQUIRES_COLUMN = False
@@ -97,6 +98,9 @@ class PostgresParser(parser.Parser):
 
     PROPERTY_PARSERS = {
         **{k: v for k, v in parser.Parser.PROPERTY_PARSERS.items() if k != "INPUT"},
+        "TABLESPACE": lambda self: self.expression(
+            exp.TableSpaceProperty(this=self._parse_id_var())
+        ),
         "SET": lambda self: self.expression(exp.SetConfigProperty(this=self._parse_set())),
     }
 
